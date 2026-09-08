@@ -168,7 +168,7 @@ api.onEvent(async msg => {
   if (msg.type === 'connected') {
     inRoom = true; me = msg.id; $('status').textContent = msg.isHost ? 'Você está hospedando' : 'Conectado à sala';
     $('host-note').textContent = msg.isHost ? 'Este computador hospeda a sala. Se sair, outro membro conectado assume.' : 'A sala é hospedada por um dos amigos conectados.';
-    $('lobby').hidden = true; $('room').hidden = false; $('copy').disabled = false;
+    $('lobby').hidden = true; $('room').hidden = false; notice('');
     $('connection-note').textContent = `Sala em ${msg.hosts.join(' / ')}:${msg.port} • Uma transmissão por vez.`;
   } else if (msg.type === 'roster') {
     members = msg.peers; presenter = msg.presenter;
@@ -184,13 +184,13 @@ api.onEvent(async msg => {
     inRoom = false; sessionEpoch++; presenter = null; pendingShare = false;
     $('picker').close(); await stopScreen();
     for (const id of peers.keys()) removePeer(id);
-    $('status').textContent = 'Trocando anfitrião…'; $('copy').disabled = true;
+    $('status').textContent = 'Trocando anfitrião…';
     notice('O anfitrião desconectou. Buscando outro membro. A tela precisará ser compartilhada novamente.');
   } else if (msg.type === 'error') notice(msg.message);
 });
 $('join-form').onsubmit = async event => {
   event.preventDefault(); notice(''); $('join').disabled = true; $('status').textContent = 'Procurando a turma…';
-  try { await api.join({ name: $('name').value, secret: $('secret').value, invite: $('invite').value.trim() }); }
+  try { await api.join({ name: $('name').value }); }
   catch (e) { error(e); $('status').textContent = 'Não conectado'; }
   finally { $('join').disabled = false; }
 };
@@ -224,7 +224,6 @@ $('quality').onchange = async () => {
     await Promise.all([...peers.values()].map(setLimits));
   } catch (e) { error(e); }
 };
-$('copy').onclick = async () => { try { await api.copyInvite(); notice('Convite copiado. Envie aos amigos na mesma rede ou VPN. Ele contém a senha de acesso.'); } catch (e) { error(e); } };
 $('fullscreen').onclick = () => { (document.fullscreenElement ? document.exitFullscreen() : $('stage').requestFullscreen()).catch(error); };
 $('leave').onclick = async () => {
   inRoom = false; sessionEpoch++; pendingShare = false; presenter = null;

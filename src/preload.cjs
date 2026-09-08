@@ -6,6 +6,5 @@ contextBridge.exposeInMainWorld('entretela', {
   send: msg => ipcRenderer.invoke('send', msg),
   sources: () => ipcRenderer.invoke('sources'),
   selectSource: choice => ipcRenderer.invoke('select-source', choice),
-  copyInvite: () => ipcRenderer.invoke('copy-invite'),
   onEvent: callback => ipcRenderer.on('room-event', (_event, msg) => callback(msg))
 });

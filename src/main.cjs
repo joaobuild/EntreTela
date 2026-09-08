@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, desktopCapturer, session, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, session } = require('electron');
 const path = require('node:path');
 const os = require('node:os');
 const { pathToFileURL } = require('node:url');
@@ -54,5 +54,4 @@ handle('select-source', choice => {
   if (choice.audio && !supported) throw new Error('A transmissão de som sem retorno requer Windows 11.');
   selected = { id: choice.id, audio: !!choice.audio, time: Date.now() };
 });
-handle('copy-invite', () => { if (room) clipboard.writeText(room.info().invite); });
 app.on('window-all-closed', () => app.quit());

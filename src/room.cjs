@@ -1,45 +1,30 @@
 const { EventEmitter } = require('node:events');
 const { randomUUID } = require('node:crypto');
 const { WebSocket } = require('ws');
-const { keyFor, roomId, seal, open } = require('./crypto.cjs');
+const { VERSION, encode, decode } = require('./protocol.cjs');
 const { createRoomServer } = require('./server.cjs');
 const { discovery, addresses } = require('./discovery.cjs');
 const pause = ms => new Promise(r => setTimeout(r, ms));
-function parseInvite(value) {
-  if (typeof value !== 'string' || value.length > 2000) throw new Error('Convite inválido.');
-  let data;
-  try { data = JSON.parse(Buffer.from(value.trim().replace(/^entretela:/, ''), 'base64url').toString()); } catch { throw new Error('Convite inválido.'); }
-  if (data.v !== 1 || !Array.isArray(data.hosts) || !data.hosts.length || data.hosts.length > 20 || !data.hosts.every(x => typeof x === 'string' && /^\d{1,3}(\.\d{1,3}){3}$/.test(x) && x.split('.').every(n => +n <= 255)) || !Number.isInteger(data.port) || data.port < 1 || data.port > 65535) throw new Error('Endereço do convite inválido.');
-  keyFor(data.secret);
-  return data;
-}
 class Room extends EventEmitter {
   constructor() { super(); this.id = randomUUID(); this.roster = []; this.closed = false; }
-  async start({ name, secret, invite }) {
+  async start({ name }) {
     if (typeof name !== 'string' || !name.trim() || name.trim().length > 32) throw new Error('Informe seu nome (até 32 caracteres).');
     this.name = name.trim();
-    const data = invite ? parseInvite(invite) : null;
-    this.secret = data ? data.secret : secret;
-    this.key = keyFor(this.secret);
-    this.server = await createRoomServer(this.key);
+    this.server = await createRoomServer();
     if (this.closed) { await this.server.close(); throw new Error('Entrada cancelada.'); }
-    this.discovery = discovery(roomId(this.key), this.id, this.server.port);
+    this.discovery = discovery(this.id, this.server.port);
     try {
-      if (data) {
-        let connected = false;
-        for (const address of data.hosts) {
-          try { await this.connect({ address, port: data.port }); connected = true; break; } catch {}
-        }
-        if (!connected) throw new Error('Não foi possível alcançar a sala. Use a mesma rede ou VPN e verifique o firewall do anfitrião.');
-      } else {
-        await pause(1800);
-        const candidates = this.discovery.candidates();
-        let connected = false;
-        for (const candidate of candidates) {
-          try { await this.connect(candidate); connected = true; break; } catch {}
-        }
-        if (!connected) throw new Error('Não foi possível iniciar a sala.');
+      await pause(1800);
+      const candidates = this.discovery.candidates();
+      const hosts = candidates.filter(candidate => candidate.leader);
+      // Never create a second room when an existing room is full/unreachable.
+      // For simultaneous first arrivals, everyone picks the same oldest peer.
+      let connected = false;
+      for (const candidate of hosts.length ? hosts : candidates) {
+        try { await this.connect(candidate); connected = true; break; }
+        catch (e) { if (e.code === 'ROOM_FULL') throw e; }
       }
+      if (!connected) throw new Error('Não foi possível entrar na sala. Verifique a rede ou VPN e o firewall e tente novamente.');
       return this.info();
     } catch (e) { await this.close(); throw e; }
   }
@@ -57,8 +42,11 @@ class Room extends EventEmitter {
       ws.on('message', raw => {
         try {
           lastSeen = Date.now();
-          const msg = open(this.key, raw);
-          if (msg.type === 'challenge') ws.send(seal(this.key, { type: 'join', id: this.id, name: this.name, port: this.server.port, challenge: msg.challenge }));
+          const msg = decode(raw);
+          if (msg.type === 'challenge') {
+            if (msg.version !== VERSION) { reject(new Error('Todos precisam usar a versão 0.2.0 ou posterior.')); ws.close(); return; }
+            ws.send(encode({ type: 'join', version: VERSION, id: this.id, name: this.name, port: this.server.port, challenge: msg.challenge }));
+          }
           else if (msg.type === 'welcome') {
             if (this.closed) { ws.close(); return reject(new Error('Entrada cancelada.')); }
             accepted = true; clearTimeout(timer);
@@ -69,7 +57,7 @@ class Room extends EventEmitter {
             resolve();
           } else if (msg.type === 'error') {
             this.emit('event', msg);
-            if (!accepted) { reject(new Error(msg.message)); ws.close(); }
+            if (!accepted) { reject(Object.assign(new Error(msg.message), { code: msg.code })); ws.close(); }
           } else if (accepted) {
             if (msg.type === 'roster') {
               this.roster = msg.peers.map(p => ({ ...p, address: p.address === '127.0.0.1' ? candidate.address : p.address }));
@@ -77,7 +65,7 @@ class Room extends EventEmitter {
             }
             this.emit('event', msg);
           }
-        } catch { ws.close(); if (!accepted) reject(new Error('Senha incorreta ou mensagem inválida.')); }
+        } catch { ws.close(); if (!accepted) reject(new Error('Mensagem inválida recebida da sala.')); }
       });
       ws.on('close', () => {
         clearTimeout(timer); clearInterval(health);
@@ -99,18 +87,18 @@ class Room extends EventEmitter {
       }
       await pause(500);
     }
-    if (!this.closed) this.emit('event', { type: 'error', message: 'Reconexão falhou. Saia e entre novamente com um convite atualizado.' });
+    if (!this.closed) this.emit('event', { type: 'error', message: 'Reconexão falhou. Confira a rede ou VPN, saia e entre novamente.' });
   }
   info() {
     const hosts = this.isHost ? addresses() : [this.target?.address].filter(Boolean);
     if (!hosts.length) hosts.push('127.0.0.1');
-    return { id: this.id, isHost: !!this.isHost, hosts, port: this.target?.port, invite: 'entretela:' + Buffer.from(JSON.stringify({ v: 1, hosts, port: this.target?.port, secret: this.secret })).toString('base64url') };
+    return { id: this.id, isHost: !!this.isHost, hosts, port: this.target?.port };
   }
-  send(msg) { if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(seal(this.key, msg)); }
+  send(msg) { if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(encode(msg)); }
   async close() {
     this.closed = true;
     this.ws?.close(); this.pending?.close(); this.discovery?.close();
     if (this.server) await this.server.close();
   }
 }
-module.exports = { Room, parseInvite };
+module.exports = { Room };

@@ -4,12 +4,12 @@ const PORT = 45873;
 function addresses() {
   return Object.values(os.networkInterfaces()).flat().filter(n => n.family === 'IPv4' && !n.internal).map(n => n.address);
 }
-function discovery(room, id, port) {
+function discovery(id, port) {
   const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
   const seen = new Map();
   const born = Date.now();
   let leader = false, ready = false;
-  const packet = () => Buffer.from(JSON.stringify({ app: 'entretela-1', room, id, port, born, leader }));
+  const packet = () => Buffer.from(JSON.stringify({ app: 'entretela-single-room-v2', id, port, born, leader }));
   const announce = () => {
     if (!ready) return;
     const targets = new Set(['255.255.255.255']);
@@ -24,7 +24,7 @@ function discovery(room, id, port) {
     try {
       if (data.length > 1000) return;
       const p = JSON.parse(data);
-      if (p.app !== 'entretela-1' || p.room !== room || p.id === id || typeof p.id !== 'string' || !Number.isFinite(p.born) || !Number.isInteger(p.port) || p.port < 1 || p.port > 65535) return;
+      if (p.app !== 'entretela-single-room-v2' || p.id === id || typeof p.id !== 'string' || !Number.isFinite(p.born) || !Number.isInteger(p.port) || p.port < 1 || p.port > 65535) return;
       seen.set(p.id, { ...p, address: info.address, seen: Date.now() });
     } catch {}
   });
