@@ -1,0 +1,40 @@
+{
+  "name": "entretela",
+  "version": "0.1.0",
+  "description": "Tela e conversa entre amigos, hospedadas no primeiro computador online.",
+  "main": "src/main.cjs",
+  "author": "EntreTela",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.cjs",
+    "dist": "electron-builder --win portable --x64",
+    "pack": "electron-builder --win --x64 --dir",
+    "test:media": "electron test/electron-smoke.cjs"
+  },
+  "dependencies": {
+    "ws": "8.21.3"
+  },
+  "devDependencies": {
+    "electron": "44.3.0",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "app.entretela.desktop",
+    "productName": "EntreTela",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "portable",
+      "signAndEditExecutable": false
+    },
+    "portable": {
+      "artifactName": "EntreTela-${version}-Windows.exe"
+    }
+  }
+}
