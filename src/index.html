@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; frame-src 'none'">
+  <title>EntreTela</title><link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header><div class="brand"><span class="logo">▣</span> EntreTela <small>entre amigos</small></div><span class="pill" id="status">Pronto para conectar</span></header>
+  <main>
+    <section id="lobby">
+      <div class="intro"><div class="eyebrow">SUA TELA. SUA TURMA.</div><h1>Juntos, mesmo<br>em telas diferentes.</h1><p>Compartilhe um jogo, um vídeo ou uma ideia.<br>A sala fica no computador de quem chegar primeiro.</p><div class="features"><span>↗ Até 10 pessoas</span><span>◉ Tela com som</span><span>⌁ Sem servidor próprio</span></div><div class="network-note"><strong>Uma rede em comum</strong><p>Na mesma rede Wi-Fi, use a mesma senha de grupo. De casas diferentes, conectem-se à mesma rede Radmin VPN ou ZeroTier e compartilhem o convite.</p></div></div>
+      <form id="join-form" class="card"><h2>Entre na conversa</h2><label for="name">Como seus amigos te chamam?</label><input id="name" maxlength="32" autocomplete="nickname" placeholder="Seu nome" required><label for="secret">Senha do grupo</label><input id="secret" type="password" minlength="8" maxlength="128" placeholder="Combinem uma senha de 8+ caracteres"><p class="hint">O primeiro a entrar hospeda. Os próximos encontram a sala na rede usando a mesma senha.</p><div class="separator">ou use um convite</div><label for="invite">Convite de um amigo</label><textarea id="invite" rows="2" placeholder="Cole o convite entretela:…" spellcheck="false"></textarea><button class="primary" id="join" type="submit">Entrar na sala <span>→</span></button><p class="hint">Seu microfone começa desligado.</p></form>
+    </section>
+    <section id="room" hidden>
+      <div class="room-heading"><div><div class="eyebrow">A TURMA ESTÁ AQUI</div><h2>Sala dos amigos <span id="count">1/10</span></h2></div><button id="copy">Copiar convite ↗</button></div>
+      <div class="room-grid"><div class="stage" id="stage"><div id="empty"><span class="big-icon">▣</span><h2>O que vamos assistir?</h2><p>Escolha uma tela ou janela para compartilhar com a turma.</p></div><video id="preview" autoplay muted playsinline hidden></video><div id="remote-videos"></div><span id="screen-label" hidden></span><button id="fullscreen" hidden>Tela cheia ⛶</button></div><aside class="card"><h3>Na sala <span id="people-count">0</span></h3><ul id="people"></ul><div class="aside-note" id="host-note"></div><p class="hint">O áudio da chamada é excluído do som transmitido. Use fones para evitar eco pelo microfone.</p></aside></div>
+      <div class="toolbar"><button id="mic">Ativar microfone</button><button id="deafen">Silenciar chamada</button><div class="spacer"></div><label for="quality">Qualidade</label><select id="quality"><option value="low">480p · econômico</option><option value="balanced" selected>720p · equilibrado</option><option value="high">1080p · detalhes</option></select><button id="share" class="primary">Compartilhar tela</button><button id="leave" class="danger">Sair</button></div>
+      <p class="hint" id="connection-note">Conexão direta entre os participantes. Uma transmissão por vez.</p>
+    </section>
+    <p id="notice" role="status" aria-live="polite" hidden></p>
+  </main>
+  <dialog id="picker"><div class="dialog-title"><div><div class="eyebrow">MOSTRE PARA A TURMA</div><h2>Escolha o que compartilhar</h2></div><button id="cancel-picker" aria-label="Fechar">✕</button></div><label class="check"><input id="with-audio" type="checkbox" checked> Compartilhar som do computador sem as vozes da sala</label><p class="hint" id="audio-note">O som pode incluir outros aplicativos abertos. A prévia local fica sem áudio.</p><div id="sources"></div></dialog>
+  <div id="audio-elements"></div>
+  <footer>EntreTela <span>Sem conta • Sem gravação • Conexão direta</span><span id="version">Windows</span></footer>
+  <script src="renderer.js"></script>
+</body></html>
