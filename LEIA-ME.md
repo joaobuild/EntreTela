@@ -1,79 +1,72 @@
-# EntreTela
+﻿# EntreTela
 
-Aplicativo para Windows x64: uma tela com som e conversa por voz para até **10 pessoas no total**, incluindo quem transmite. Versão inicial 0.1.0.
+Uma única sala para você e seus amigos compartilharem tela com som e conversarem por voz. Até **10 pessoas no total**, incluindo quem transmite. Versão **0.2.0**, Windows x64.
 
-## Como usar
+[Baixar a versão 0.2.0](https://github.com/joaobuild/EntreTela/releases/tag/v0.2.0)
 
-1. Todos abrem `EntreTela-0.1.0-Windows.exe`. Não é necessário instalar Node.js para usar o executável.
-2. Na mesma rede, combinem uma senha de grupo de pelo menos 8 caracteres. Usem uma frase longa e exclusiva. Cada pessoa informa seu nome e essa senha e clica em **Entrar na sala**. O primeiro a entrar inicia o servidor de coordenação no próprio computador.
-3. De casas diferentes, conectem os computadores à **mesma rede virtual Radmin VPN ou ZeroTier**. O primeiro entra no EntreTela, clica em **Copiar convite** e envia o texto aos amigos. Os demais colam o convite no aplicativo. O convite inclui a senha; compartilhe somente com a turma.
-4. Permitam a comunicação do EntreTela pelo Firewall do Windows na rede utilizada. Isso também é necessário nos computadores que poderão assumir a sala. A aplicação não altera regras do firewall sozinha.
-5. Clique em **Ativar microfone** para conversar. Ele começa desligado.
-6. Clique em **Compartilhar tela**, escolha a tela ou janela e mantenha a opção de som marcada, se disponível. Uma pessoa transmite por vez. A qualidade inicial é 720p a até 24 quadros por segundo.
-7. Use **Parar transmissão** para encerrar a tela e **Sair** para desconectar.
+## Como entrar
 
-Se o anfitrião sair, os membros restantes tentam assumir a sala seguindo a ordem de entrada. A reconexão exige que eles consigam alcançar uns aos outros. Pode levar alguns segundos; a tela precisa ser compartilhada novamente. Copiem um novo convite depois da troca, pois o endereço anterior pertence ao anfitrião antigo.
+1. Todos abrem `EntreTela-0.2.0-Windows.exe`.
+2. Cada pessoa informa somente seu nome e clica em **Entrar na sala**.
+3. O aplicativo encontra a sala automaticamente. O primeiro participante hospeda no próprio computador; os próximos entram na mesma sala.
+4. Clique em **Ativar microfone** para conversar ou **Compartilhar tela** para mostrar uma tela ou janela. O microfone começa desligado.
 
-## Tela com som sem repetir as vozes
+**Não há senha, convite, código de sala ou escolha entre várias salas.** Se a sala já tiver dez pessoas, aguarde alguém sair. Se o anfitrião sair, outro participante conectado tenta assumir; depois da reconexão, a tela precisa ser compartilhada novamente.
 
-O microfone, o vídeo e o som da tela usam trilhas separadas. O aplicativo não reproduz seu próprio microfone nem o som de sua própria prévia.
+## Rede necessária
 
-A captura solicita `restrictOwnAudio: true` para excluir a reprodução da própria chamada do áudio compartilhado. O programa verifica o suporte e a configuração retornada pelo Windows antes de transmitir som. Se a confirmação não estiver disponível, a transmissão com som é interrompida; ainda é possível compartilhar a tela desmarcando o som.
+Na mesma rede local, basta entrar. De casas diferentes, todos precisam estar na **mesma rede Radmin VPN ou ZeroTier**, com descoberta local/broadcast permitida. Permitam o EntreTela no firewall da rede utilizada, em todos os computadores. O aplicativo não muda regras de firewall.
 
-Use **Windows 11** para o recurso completo. A API de exclusão de áudio de processos requer build **20348 ou posterior**; versões comuns do Windows 10, como build 19045, ficam restritas à tela sem som nesta versão. O Electron está fixado em 44.3.0, que inclui a correção de encaminhamento dessa opção.
+A descoberta usa broadcast UDP 45873. A coordenação usa uma porta TCP dinâmica e a mídia usa WebRTC. Redes que bloqueiam descoberta, isolam clientes Wi-Fi ou não encaminham broadcasts podem impedir que os participantes encontrem a sala. Nessa situação, corrijam a rede ou VPN; não há entrada por convite ou endereço nesta versão.
 
-Use fones. O cancelamento de eco do microfone ajuda com som vindo dos alto-falantes, mas não garante eliminar todo eco acústico. Vozes reproduzidas por **outros aplicativos**, como uma chamada do Discord aberta em paralelo, não pertencem à chamada do EntreTela e podem entrar no som transmitido. Façam a conversa pelo EntreTela.
+A sala única é encontrada entre os computadores alcançáveis da mesma rede. Não existe uma sala global na internet nem um servidor de cadastro: computadores em redes isoladas não conseguem saber quem abriu primeiro. A aplicação não atravessa qualquer NAT/CGNAT sozinha e não inclui STUN/TURN. A VPN possui infraestrutura própria, mas não exige que você mantenha um servidor EntreTela.
 
-Ao compartilhar uma janela, o som solicitado é o **som do computador**, com exclusão do EntreTela; ele não fica restrito àquela janela. Conteúdo protegido pode aparecer preto ou sem áudio.
+Como não há senha ou autenticação, **qualquer pessoa na mesma rede alcançável pode entrar**. Usem a rede local ou VPN da turma. Nomes servem apenas para identificação na interface. Publicar o código no GitHub não libera acesso à rede de vocês.
 
-## Rede e desempenho
+O áudio e o vídeo são cifrados pelo WebRTC. A sinalização desta versão não usa uma chave compartilhada ou senha: a privacidade do tráfego de coordenação depende da rede/VPN utilizada. Não há gravação, conta ou serviço EntreTela na nuvem.
 
-- Não existe servidor EntreTela na nuvem, login, gravação ou serviço de retransmissão configurado. O servidor local só encaminha mensagens para conectar os participantes; áudio e vídeo trafegam diretamente por WebRTC.
-- A descoberta automática usa UDP 45873. A coordenação usa uma porta TCP local dinâmica, incluída no convite. WebRTC usa portas de mídia negociadas automaticamente.
-- Sem uma rede alcançável entre os computadores, não há conexão. Esta versão **não atravessa qualquer NAT/CGNAT sozinha** e não inclui STUN/TURN. Serviços de VPN têm infraestrutura própria; não são servidores EntreTela mantidos por você.
-- Se a descoberta automática for bloqueada pelo roteador ou VPN, use o convite. O convite inclui os endereços IPv4 das interfaces do anfitrião e tenta alcançá-los. Interfaces indisponíveis podem tornar a entrada mais lenta.
-- A senha define o grupo; nomes não autenticam a identidade pessoal. Todos os convidados têm permissão de falar e solicitar compartilhamento. Não há painel de moderação nesta versão.
-- A sinalização é criptografada com AES-256-GCM, com chave derivada por scrypt. O WebRTC cifra a mídia em trânsito. Endereços de rede e existência do grupo não ficam ocultos de outros dispositivos na rede.
-- O transmissor envia uma cópia para cada espectador. O orçamento configurado para vídeo é de **até 8 Mbit/s somando os destinatários**, sem contar áudio, cabeçalhos e retransmissões. Para nove espectadores, isso reduz o limite de vídeo por destinatário a aproximadamente 889 kbit/s. A qualidade real se adapta à rede.
-- Voz: até 40 kbit/s por destinatário; som compartilhado: até 96 kbit/s por destinatário. Esses valores são limites solicitados ao navegador, não garantias de tráfego exato.
-- O modo 480p/15 fps reduz o trabalho do computador. O modo 1080p/30 fps exige mais. Apenas uma captura de tela é aberta; ainda há até nove conexões e codificações de saída.
-- O aplicativo usa Electron/Chromium, portanto não é um binário ultrapequeno. O desempenho com dez pessoas depende do processador, da placa de vídeo e do upload de quem transmite. Ainda não houve ensaio com dez computadores físicos.
+## Tela com som, sem repetir as vozes
 
-## Verificação realizada
+Microfone, vídeo e som da tela usam trilhas separadas. O programa não reproduz o próprio microfone nem o som da própria prévia. A captura solicita `restrictOwnAudio: true` para excluir as vozes reproduzidas pelo EntreTela do som compartilhado e verifica a configuração retornada antes de transmitir som.
 
-- Testes automatizados: criptografia e adulteração, convites inválidos, entrada de dez pessoas e rejeição da décima primeira, roteamento sem falsificar remetente, exclusividade da transmissão, saída de participantes, IDs duplicados e troca de anfitrião.
-- Teste de integração em duas janelas: conexão WebRTC real, microfones sintéticos nos dois sentidos, vídeo sintético decodificado, som da tela em trilha separada, limite de bitrate aplicado, prévia sem áudio, silenciamento e encerramento da transmissão.
-- A restrição `restrictOwnAudio` foi detectada no runtime usado. **A captura de áudio real com exclusão das vozes ainda requer validação em dois computadores**, assim como firewall, VPN e desempenho com dez usuários.
-- O teste gráfico local precisou de `--no-sandbox` por restrições do ambiente de execução automatizado. Esse parâmetro **não é usado pelo aplicativo distribuído**, que mantém isolamento de contexto, sandbox do renderer e acesso restrito à ponte nativa.
+Use **Windows 11** para o recurso completo. A API de exclusão por processo exige build 20348 ou posterior. Versões comuns do Windows 10, como build 19045, ficam restritas à tela sem som. Se a exclusão não for confirmada, o programa interrompe a captura com som e permite tentar novamente desmarcando essa opção.
 
-## Código e GitHub
+Use fones: o cancelamento de eco ajuda, mas não garante eliminar todo eco acústico dos alto-falantes. Uma chamada aberta em outro aplicativo, como Discord, pode ser capturada; façam a conversa pelo EntreTela. Mesmo quando uma janela é escolhida, o áudio capturado é o som do computador com exclusão do EntreTela, e não somente daquela janela. Conteúdo protegido pode aparecer preto ou sem áudio.
 
-O código-fonte está incluído. O projeto contém um fluxo GitHub Actions em `.github/workflows/windows.yml` para testar e gerar o executável ao enviar o projeto a um repositório. Repositório: https://github.com/joaobuild/EntreTela (privado).
+## Desempenho
 
-Com Node.js 24 instalado, na pasta do projeto:
+Uma pessoa compartilha por vez. O padrão é 720p/24 fps, com opções 480p/15 fps e 1080p/30 fps. O transmissor envia uma cópia para cada espectador. O limite solicitado para vídeo é até 8 Mbit/s somando os destinatários, sem contar áudio, cabeçalhos e retransmissões. Voz usa até 40 kbit/s por destinatário e som da tela até 96 kbit/s por destinatário.
+
+O modo 480p reduz o consumo. Electron/Chromium não produz um binário ultrapequeno; desempenho e qualidade com nove espectadores dependem de CPU, GPU e upload de quem transmite. Ainda não houve ensaio com dez computadores físicos.
+
+## Atualização e testes
+
+Todos devem usar a versão 0.2.0. Ela não se conecta às salas com senha da versão 0.1.0.
+
+Testes automatizados cobrem entrada somente com nome, descoberta da mesma sala, entradas simultâneas, troca de anfitrião, limite de dez pessoas, recusa de sala cheia sem criar outra, versões incompatíveis, mensagens malformadas e exclusividade da transmissão. O teste de integração usa a interface real com duas janelas e mídia sintética para verificar áudio nos dois sentidos, vídeo decodificado, som separado, limite de bitrate, prévia sem áudio e controles de silenciar/parar.
+
+A captura de áudio real com exclusão das vozes e o desempenho com dez computadores ainda precisam de validação prática. O teste gráfico local usa `--no-sandbox` apenas por restrições do ambiente automatizado. O programa distribuído mantém o sandbox do renderer, isolamento de contexto e ponte nativa restrita.
+
+## Desenvolvimento
+
+Repositório público: [joaobuild/EntreTela](https://github.com/joaobuild/EntreTela).
+
+Com Node.js 24 instalado:
 
 ```powershell
 npm ci
 npm test
-npm start
-```
-
-Para teste de mídia sintética e geração do executável:
-
-```powershell
 npm run test:media
+npm start
 npm run dist
 ```
 
-O executável fica em `release/EntreTela-0.1.0-Windows.exe`. Não há assinatura comercial de código nesta versão.
+O executável é gerado em `release/EntreTela-0.2.0-Windows.exe`. O GitHub Actions também executa os testes e gera um artefato Windows a cada envio para o repositório. O executável não possui assinatura comercial de código.
 
-## Referências técnicas
+## Referências e licença
 
-- [Correção do Electron para excluir o áudio próprio](https://releases.electronjs.org/pr/52455)
-- [Configuração de captura de tela no Electron](https://www.electronjs.org/docs/latest/api/session#sessetdisplaymediarequesthandlerhandler-opts)
-- [API de captura de áudio por processo do Windows](https://learn.microsoft.com/en-us/windows/win32/api/audioclientactivationparams/ns-audioclientactivationparams-audioclient_process_loopback_params)
+- [Correção de exclusão do áudio próprio no Electron](https://releases.electronjs.org/pr/52455)
+- [API de captura por processo do Windows](https://learn.microsoft.com/en-us/windows/win32/api/audioclientactivationparams/ns-audioclientactivationparams-audioclient_process_loopback_params)
 - [Verificação de restrictOwnAudio](https://developer.mozilla.org/en-US/docs/Web/API/MediaTrackSettings/restrictOwnAudio)
 
-## Licença
-
-Código do EntreTela sob licença MIT. Electron, Chromium e demais dependências têm suas próprias licenças, incluídas no pacote distribuído.
+Código EntreTela sob licença MIT. Electron, Chromium e demais dependências mantêm suas próprias licenças.

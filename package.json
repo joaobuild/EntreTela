@@ -1,6 +1,6 @@
 {
   "name": "entretela",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Tela e conversa entre amigos, hospedadas no primeiro computador online.",
   "main": "src/main.cjs",
   "author": "EntreTela",
