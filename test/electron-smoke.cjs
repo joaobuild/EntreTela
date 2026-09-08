@@ -1,4 +1,4 @@
-// Runs the actual UI, real encrypted signaling and real WebRTC in two hidden
+// Runs the actual UI, automatic LAN discovery and real WebRTC in two hidden
 // windows. Only synthetic camera/microphone/audio are used; no desktop capture.
 const { app, BrowserWindow, ipcMain, session } = require('electron');
 const { Room } = require('../src/room.cjs');
@@ -24,7 +24,7 @@ async function run() {
   await app.whenReady(); fs.mkdirSync(out, { recursive: true });
   session.defaultSession.setPermissionRequestHandler((_wc, _p, cb) => cb(true));
   session.defaultSession.setPermissionCheckHandler(() => true);
-  ipcMain.handle('test-capabilities', () => ({ audio: true, version: '0.1.0', electron: process.versions.electron }));
+  ipcMain.handle('test-capabilities', () => ({ audio: true, version: '0.2.0', electron: process.versions.electron }));
   ipcMain.handle('test-send', (e, msg) => rooms.get(e.sender.id)?.send(msg));
   ipcMain.handle('test-leave', e => rooms.get(e.sender.id)?.close());
   ipcMain.handle('test-join', async (e, opts) => {
@@ -41,10 +41,12 @@ async function run() {
   const [a, b] = windows; const js = (w, code) => w.webContents.executeJavaScript(code, true);
   await pause(400);
   fs.writeFileSync(path.join(out, 'lobby.png'), (await a.webContents.capturePage()).toPNG());
-  const aInfo = await js(a, `api.join({name:'Ana',secret:'smoke-test-password'})`);
-  const roomA = rooms.get(a.webContents.id);
-  const invite = 'entretela:' + Buffer.from(JSON.stringify({ v: 1, hosts: ['127.0.0.1'], port: roomA.server.port, secret: 'smoke-test-password' })).toString('base64url');
-  await js(b, `api.join({name:'Bruno',invite:${JSON.stringify(invite)}})`);
+  assert.equal(await js(a, `document.querySelectorAll('#secret, #invite, #copy').length`), 0);
+  // Exercise the real one-field form instead of bypassing it through the API.
+  await js(a, `$('name').value = 'Ana'; $('join-form').requestSubmit()`);
+  await waitFor(() => js(a, `inRoom`), 'first member starts single room');
+  await js(b, `$('name').value = 'Bruno'; $('join-form').requestSubmit()`);
+  await waitFor(() => js(b, `inRoom`), 'second member discovers single room');
   await waitFor(async () => await js(a, `peers.size === 1 && [...peers.values()][0].pc.connectionState === 'connected'`) && await js(b, `peers.size === 1 && [...peers.values()][0].pc.connectionState === 'connected'`), 'WebRTC connected');
   await js(a, `$('mic').click()`);
   await js(b, `$('mic').click()`);
