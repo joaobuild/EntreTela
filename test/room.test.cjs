@@ -76,3 +76,30 @@ test('a full discovered room never silently creates a second room', { timeout: 1
   await assert.rejects(newcomer.start({ name: 'Eleven' }), e => e.code === 'ROOM_FULL');
   assert.equal(newcomer.closed, true);
 });
+
+function announcedHost(host) {
+  return (id, port) => ({ candidates: () => [host, { id, port, address: '127.0.0.1' }], promote() {}, close() {} });
+}
+test('joins the same advertised host through an alternate address after refusal', async t => {
+  const server = await createRoomServer({ host: '127.0.0.1' });
+  const room = new Room({ discoveryWait: 0, discovery: announcedHost({ id: 'host', leader: true, port: server.port, address: '127.0.0.2', addresses: ['127.0.0.2', '127.0.0.1'] }) });
+  t.after(async () => { await room.close(); await server.close(); });
+  const info = await room.start({ name: 'Guest' });
+  assert.equal(info.port, server.port);
+  assert.equal(info.isHost, false);
+  assert.equal(room.target.address, '127.0.0.1');
+});
+test('an unreachable advertised host reports the endpoint and never creates a second room', async t => {
+  const server = await createRoomServer({ host: '127.0.0.1' });
+  const room = new Room({ discoveryWait: 0, discovery: announcedHost({ id: 'host', leader: true, port: server.port, address: '127.0.0.2' }) });
+  t.after(async () => { await room.close(); await server.close(); });
+  await assert.rejects(room.start({ name: 'Guest' }), error => {
+    assert.equal(error.code, 'HOST_UNREACHABLE');
+    assert.match(error.message, new RegExp(`127\\.0\\.0\\.2:${server.port}`));
+    assert.match(error.message, /conexão recusada/);
+    assert.match(error.message, /Permitir conexão no Windows/);
+    return true;
+  });
+  assert.equal(room.closed, true);
+  assert.equal(room.isHost, undefined);
+});

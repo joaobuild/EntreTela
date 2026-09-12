@@ -24,13 +24,15 @@ async function run() {
   await app.whenReady(); fs.mkdirSync(out, { recursive: true });
   session.defaultSession.setPermissionRequestHandler((_wc, _p, cb) => cb(true));
   session.defaultSession.setPermissionCheckHandler(() => true);
-  ipcMain.handle('test-capabilities', () => ({ audio: true, version: '0.2.0', electron: process.versions.electron }));
+  ipcMain.handle('test-capabilities', () => ({ audio: true, version: require('../package.json').version, electron: process.versions.electron }));
   ipcMain.handle('test-send', (e, msg) => rooms.get(e.sender.id)?.send(msg));
   ipcMain.handle('test-leave', e => rooms.get(e.sender.id)?.close());
   ipcMain.handle('test-join', async (e, opts) => {
+    if (opts.name === 'Falha de teste') return { ok: false, code: 'HOST_UNREACHABLE', message: 'Encontrei a sala, mas não consegui conectar: conexão recusada.' };
     const r = new Room(); rooms.set(e.sender.id, r);
     r.on('event', msg => { if (!e.sender.isDestroyed()) e.sender.send('room-event', msg); });
-    return r.start(opts);
+    try { return { ok: true, ...await r.start(opts) }; }
+    catch (error) { return { ok: false, message: error.message }; }
   });
   for (let i = 0; i < 2; i++) {
     const win = new BrowserWindow({ show: false, width: 1180, height: 800, webPreferences: { preload: path.join(__dirname, 'smoke-preload.cjs'), sandbox: true, contextIsolation: true, backgroundThrottling: false, offscreen: true } });
@@ -42,6 +44,11 @@ async function run() {
   await pause(400);
   fs.writeFileSync(path.join(out, 'lobby.png'), (await a.webContents.capturePage()).toPNG());
   assert.equal(await js(a, `document.querySelectorAll('#secret, #invite, #copy').length`), 0);
+  await js(a, `$('name').value = 'Falha de teste'; $('join-form').requestSubmit()`);
+  await waitFor(() => js(a, `$('notice').textContent.includes('conexão recusada') && !$('join').disabled`), 'clear retryable join error');
+  assert.equal(await js(a, `$('notice').textContent.includes('Error invoking') || inRoom`), false);
+  await js(a, `$('allow-network').click()`);
+  await waitFor(() => js(a, `$('notice').textContent === 'Permissão simulada no teste.' && !$('allow-network').disabled`), 'network permission UI without system changes');
   // Exercise the real one-field form instead of bypassing it through the API.
   await js(a, `$('name').value = 'Ana'; $('join-form').requestSubmit()`);
   await waitFor(() => js(a, `inRoom`), 'first member starts single room');
