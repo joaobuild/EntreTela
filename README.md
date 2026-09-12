@@ -1,21 +1,26 @@
 ﻿# EntreTela
 
-Uma única sala para você e seus amigos compartilharem tela com som e conversarem por voz. Até **10 pessoas no total**, incluindo quem transmite. Versão **0.2.0**, Windows x64.
+Uma única sala para você e seus amigos compartilharem tela com som e conversarem por voz. Até **10 pessoas no total**, incluindo quem transmite. Versão **0.2.1**, Windows x64.
 
-[Baixar a versão 0.2.0](https://github.com/joaobuild/EntreTela/releases/tag/v0.2.0)
+[Baixar EntreTela 0.2.1 para Windows](https://github.com/joaobuild/EntreTela/releases/download/v0.2.1/EntreTela-0.2.1-Windows.exe) · [Página da versão](https://github.com/joaobuild/EntreTela/releases/tag/v0.2.1)
 
 ## Como entrar
 
-1. Todos abrem `EntreTela-0.2.0-Windows.exe`.
-2. Cada pessoa informa somente seu nome e clica em **Entrar na sala**.
-3. O aplicativo encontra a sala automaticamente. O primeiro participante hospeda no próprio computador; os próximos entram na mesma sala.
-4. Clique em **Ativar microfone** para conversar ou **Compartilhar tela** para mostrar uma tela ou janela. O microfone começa desligado.
+1. Todos fecham a versão anterior e abrem `EntreTela-0.2.1-Windows.exe`.
+2. Para usar de casas diferentes, conectem os dois computadores à mesma rede do **Radmin VPN**.
+3. Em **ambos os computadores**, com o Radmin ligado, cliquem em **Permitir conexão no Windows** e aceitem o pedido de administrador do Windows (UAC). Isso permite que qualquer um dos dois hospede a sala ao entrar primeiro.
+4. Cada pessoa informa somente seu nome e clica em **Entrar na sala**. O aplicativo encontra a sala automaticamente: o primeiro participante hospeda no próprio computador e os próximos entram na mesma sala.
+5. Clique em **Ativar microfone** para conversar ou **Compartilhar tela** para mostrar uma tela ou janela. O microfone começa desligado.
 
 **Não há senha, convite, código de sala ou escolha entre várias salas.** Se a sala já tiver dez pessoas, aguarde alguém sair. Se o anfitrião sair, outro participante conectado tenta assumir; depois da reconexão, a tela precisa ser compartilhada novamente.
 
 ## Rede necessária
 
-Na mesma rede local, basta entrar. De casas diferentes, todos precisam estar na **mesma rede Radmin VPN ou ZeroTier**, com descoberta local/broadcast permitida. Permitam o EntreTela no firewall da rede utilizada, em todos os computadores. O aplicativo não muda regras de firewall.
+Na mesma rede local, todos precisam estar em uma rede que permita comunicação entre os computadores. De casas diferentes, todos precisam estar na **mesma rede Radmin VPN ou ZeroTier**, com descoberta local/broadcast permitida.
+
+O botão **Permitir conexão no Windows** configura regras de entrada TCP e UDP para o executável que roda o EntreTela. Quando o Radmin está ligado, as regras ficam limitadas à interface e à sub-rede do Radmin. Sem Radmin, usam as interfaces e sub-redes locais disponíveis. O botão exige confirmação do Windows e não desliga o firewall. Cada participante precisa liberar a conexão no próprio computador, pois qualquer participante pode ser o anfitrião. Firewalls de outros fornecedores podem exigir uma permissão equivalente.
+
+A versão 0.2.1 corrige a descoberta em computadores com vários adaptadores de rede, como Wi-Fi e Radmin ao mesmo tempo. O programa mantém endereços alternativos de cada participante e tenta outras conexões quando um endereço falha. As mensagens de erro mostram o endereço tentado e a causa da falha para ajudar no diagnóstico.
 
 A descoberta usa broadcast UDP 45873. A coordenação usa uma porta TCP dinâmica e a mídia usa WebRTC. Redes que bloqueiam descoberta, isolam clientes Wi-Fi ou não encaminham broadcasts podem impedir que os participantes encontrem a sala. Nessa situação, corrijam a rede ou VPN; não há entrada por convite ou endereço nesta versão.
 
@@ -41,11 +46,11 @@ O modo 480p reduz o consumo. Electron/Chromium não produz um binário ultrapequ
 
 ## Atualização e testes
 
-Todos devem usar a versão 0.2.0. Ela não se conecta às salas com senha da versão 0.1.0.
+Todos devem atualizar para a versão 0.2.1 para receber as correções de conexão. Ela não se conecta às salas com senha da versão 0.1.0. Fechem o EntreTela antes de substituir ou abrir outro executável: a versão portátil usa uma pasta de execução estável para manter o caminho das permissões do firewall entre atualizações.
 
 Testes automatizados cobrem entrada somente com nome, descoberta da mesma sala, entradas simultâneas, troca de anfitrião, limite de dez pessoas, recusa de sala cheia sem criar outra, versões incompatíveis, mensagens malformadas e exclusividade da transmissão. O teste de integração usa a interface real com duas janelas e mídia sintética para verificar áudio nos dois sentidos, vídeo decodificado, som separado, limite de bitrate, prévia sem áudio e controles de silenciar/parar.
 
-A captura de áudio real com exclusão das vozes e o desempenho com dez computadores ainda precisam de validação prática. O teste gráfico local usa `--no-sandbox` apenas por restrições do ambiente automatizado. O programa distribuído mantém o sandbox do renderer, isolamento de contexto e ponte nativa restrita.
+Os testes locais e de mídia sintética não substituem uma chamada entre dois computadores físicos pelo Radmin. Essa validação, a captura de áudio real com exclusão das vozes e o desempenho com dez computadores ainda precisam de ensaio prático. O teste gráfico local usa `--no-sandbox` apenas por restrições do ambiente automatizado. O programa distribuído mantém o sandbox do renderer, isolamento de contexto e ponte nativa restrita.
 
 ## Desenvolvimento
 
@@ -61,7 +66,7 @@ npm start
 npm run dist
 ```
 
-O executável é gerado em `release/EntreTela-0.2.0-Windows.exe`. O GitHub Actions também executa os testes e gera um artefato Windows a cada envio para o repositório. O executável não possui assinatura comercial de código.
+O executável é gerado em `release/EntreTela-0.2.1-Windows.exe`. O GitHub Actions também executa os testes e gera um artefato Windows a cada envio para o repositório. O executável não possui assinatura comercial de código.
 
 ## Referências e licença
 
