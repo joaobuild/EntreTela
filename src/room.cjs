@@ -5,46 +5,66 @@ const { VERSION, encode, decode } = require('./protocol.cjs');
 const { createRoomServer } = require('./server.cjs');
 const { discovery, addresses } = require('./discovery.cjs');
 const pause = ms => new Promise(r => setTimeout(r, ms));
+function connectionFailure(failures) {
+  const reasons = { ECONNREFUSED: 'conexão recusada', ETIMEDOUT: 'tempo de conexão esgotado', EHOSTUNREACH: 'computador inacessível', ENETUNREACH: 'rede inacessível', EACCES: 'conexão bloqueada', ECONNRESET: 'conexão interrompida' };
+  const details = failures.map(({ address, port, error }) => `${address}:${port} (${reasons[error.code] || error.message})`).join('; ');
+  return Object.assign(new Error(`Encontrei a sala, mas não consegui conectar: ${details}. Nos dois computadores, mantenham o Radmin na mesma rede e cliquem em “Permitir conexão no Windows”. Depois tentem entrar novamente.`), { code: 'HOST_UNREACHABLE' });
+}
 class Room extends EventEmitter {
-  constructor() { super(); this.id = randomUUID(); this.roster = []; this.closed = false; }
+  constructor(options = {}) { super(); this.options = options; this.id = randomUUID(); this.roster = []; this.closed = false; }
   async start({ name }) {
     if (typeof name !== 'string' || !name.trim() || name.trim().length > 32) throw new Error('Informe seu nome (até 32 caracteres).');
     this.name = name.trim();
     this.server = await createRoomServer();
     if (this.closed) { await this.server.close(); throw new Error('Entrada cancelada.'); }
-    this.discovery = discovery(this.id, this.server.port);
+    this.discovery = (this.options.discovery || discovery)(this.id, this.server.port);
     try {
-      await pause(1800);
+      await pause(this.options.discoveryWait ?? 1800);
+      if (this.closed) throw new Error('Entrada cancelada.');
       const candidates = this.discovery.candidates();
       const hosts = candidates.filter(candidate => candidate.leader);
       // Never create a second room when an existing room is full/unreachable.
       // For simultaneous first arrivals, everyone picks the same oldest peer.
       let connected = false;
+      const failures = [];
       for (const candidate of hosts.length ? hosts : candidates) {
-        try { await this.connect(candidate); connected = true; break; }
-        catch (e) { if (e.code === 'ROOM_FULL') throw e; }
+        try { await this.connectCandidate(candidate); connected = true; break; }
+        catch (e) { if (['ROOM_FULL', 'VERSION_MISMATCH'].includes(e.code)) throw e; failures.push(...(e.failures || [{ ...candidate, error: e }])); }
       }
-      if (!connected) throw new Error('Não foi possível entrar na sala. Verifique a rede ou VPN e o firewall e tente novamente.');
+      if (!connected) throw connectionFailure(failures);
       return this.info();
     } catch (e) { await this.close(); throw e; }
   }
+  async connectCandidate(candidate) {
+    const failures = [];
+    const endpoints = [...new Set([candidate.address, ...(candidate.addresses || [])].filter(Boolean))].slice(0, 12);
+    for (const address of endpoints) {
+      if (this.closed) throw new Error('Entrada cancelada.');
+      try { await this.connect({ ...candidate, address }); return; }
+      catch (error) {
+        if (['ROOM_FULL', 'VERSION_MISMATCH'].includes(error.code)) throw error;
+        failures.push({ address, port: candidate.port, error });
+      }
+    }
+    throw Object.assign(connectionFailure(failures), { failures });
+  }
   async connect(candidate) {
     if (this.closed) throw new Error('Sala fechada.');
-    const ws = new WebSocket(`ws://${candidate.address}:${candidate.port}`, { maxPayload: 100000, perMessageDeflate: false, handshakeTimeout: 2200 });
+    const ws = new WebSocket(`ws://${candidate.address}:${candidate.port}`, { maxPayload: 100000, perMessageDeflate: false, handshakeTimeout: 4000 });
     this.pending = ws;
     await new Promise((resolve, reject) => {
       let accepted = false;
       let lastSeen = Date.now();
-      const timer = setTimeout(() => { ws.terminate(); reject(new Error('A sala não respondeu.')); }, 3500);
+      const timer = setTimeout(() => { reject(Object.assign(new Error('A sala não respondeu.'), { code: 'ETIMEDOUT' })); ws.terminate(); }, 5500);
       const health = setInterval(() => { if (Date.now() - lastSeen > 11000) ws.terminate(); }, 2000);
       ws.on('ping', () => { lastSeen = Date.now(); });
-      ws.on('error', () => { if (!accepted) reject(new Error('Falha na conexão.')); });
+      ws.on('error', error => { if (!accepted) reject(Object.assign(new Error(error.message.includes('timed out') ? 'A sala não respondeu.' : 'Falha na conexão.'), { code: error.code || (error.message.includes('timed out') ? 'ETIMEDOUT' : 'CONNECTION_FAILED') })); });
       ws.on('message', raw => {
         try {
           lastSeen = Date.now();
           const msg = decode(raw);
           if (msg.type === 'challenge') {
-            if (msg.version !== VERSION) { reject(new Error('Todos precisam usar a versão 0.2.0 ou posterior.')); ws.close(); return; }
+            if (msg.version !== VERSION) { reject(Object.assign(new Error('A sala usa uma versão incompatível. Atualizem o EntreTela nos dois computadores.'), { code: 'VERSION_MISMATCH' })); ws.close(); return; }
             ws.send(encode({ type: 'join', version: VERSION, id: this.id, name: this.name, port: this.server.port, challenge: msg.challenge }));
           }
           else if (msg.type === 'welcome') {
@@ -82,8 +102,9 @@ class Room extends EventEmitter {
     // same join order; the oldest reachable member becomes the next host.
     for (let round = 0; round < 3 && !this.closed; round++) {
       for (const p of candidates) {
-        const candidate = p.id === this.id ? { address: '127.0.0.1', port: this.server.port } : p;
-        try { await this.connect(candidate); return; } catch {}
+        const discovered = this.discovery.candidates().find(peer => peer.id === p.id);
+        const candidate = p.id === this.id ? { address: '127.0.0.1', port: this.server.port } : { ...p, addresses: discovered?.addresses || [] };
+        try { await this.connectCandidate(candidate); return; } catch {}
       }
       await pause(500);
     }

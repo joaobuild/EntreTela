@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('entretela', {
   capabilities: () => ipcRenderer.invoke('capabilities'),
   join: opts => ipcRenderer.invoke('join', opts),
+  allowNetwork: () => ipcRenderer.invoke('allow-network'),
   leave: () => ipcRenderer.invoke('leave'),
   send: msg => ipcRenderer.invoke('send', msg),
   sources: () => ipcRenderer.invoke('sources'),

@@ -190,9 +190,16 @@ api.onEvent(async msg => {
 });
 $('join-form').onsubmit = async event => {
   event.preventDefault(); notice(''); $('join').disabled = true; $('status').textContent = 'Procurando a turma…';
-  try { await api.join({ name: $('name').value }); }
+  try { const result = await api.join({ name: $('name').value }); if (!result.ok) throw new Error(result.message); }
   catch (e) { error(e); $('status').textContent = 'Não conectado'; }
   finally { $('join').disabled = false; }
+};
+$('allow-network').onclick = async () => {
+  $('allow-network').disabled = true;
+  notice('Aguarde a autorização do Windows para permitir a conexão do EntreTela.');
+  try { const result = await api.allowNetwork(); notice(result.message); }
+  catch (e) { error(e); }
+  finally { $('allow-network').disabled = false; }
 };
 $('mic').onclick = async () => {
   if (!inRoom) return;

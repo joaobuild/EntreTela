@@ -3,6 +3,7 @@ const path = require('node:path');
 const os = require('node:os');
 const { pathToFileURL } = require('node:url');
 const { Room } = require('./room.cjs');
+const { allowNetwork } = require('./windows-network.cjs');
 let win, room, selected = null, starting = false;
 const page = pathToFileURL(path.join(__dirname, 'index.html')).href;
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -36,11 +37,19 @@ function handle(name, fn) {
 }
 handle('capabilities', () => ({ audio: process.platform === 'win32' && Number(os.release().split('.')[2]) >= 20348, version: app.getVersion(), electron: process.versions.electron }));
 handle('join', async opts => {
-  if (starting || room) throw new Error('Você já está entrando em uma sala.');
+  if (starting || room) return { ok: false, message: 'Você já está entrando em uma sala.' };
   starting = true;
   const current = new Room(); room = current;
   current.on('event', msg => { if (room === current && !win?.isDestroyed()) win.webContents.send('room-event', msg); });
-  try { return await current.start(opts); } catch (e) { if (room === current) room = null; throw e; } finally { starting = false; }
+  try { return { ok: true, ...await current.start(opts) }; } catch (e) { if (room === current) room = null; return { ok: false, message: e.message, code: e.code }; } finally { starting = false; }
+});
+let allowingNetwork = false;
+handle('allow-network', async () => {
+  if (allowingNetwork) return { ok: false, message: 'Aguarde a autorização do Windows.' };
+  allowingNetwork = true;
+  try { return await allowNetwork(); }
+  catch { return { ok: false, message: 'Não foi possível configurar a permissão. Tente novamente e aceite a autorização do Windows.' }; }
+  finally { allowingNetwork = false; }
 });
 handle('leave', async () => { const old = room; room = null; await old?.close(); });
 handle('send', msg => {
