@@ -1,8 +1,8 @@
-﻿# EntreTela
+# EntreTela
 
 Uma única sala para você e seus amigos compartilharem tela com som e conversarem por voz. Até **10 pessoas no total**, incluindo quem transmite. Versão **0.2.1**, Windows x64.
 
-[Baixar EntreTela 0.2.1 para Windows](https://github.com/joaobuild/EntreTela/releases/download/v0.2.1/EntreTela-0.2.1-Windows.exe) · [Página da versão](https://github.com/joaobuild/EntreTela/releases/tag/v0.2.1)
+[Baixar EntreTela 0.2.1 para Windows](https://github.com/joaobuild/EntreTela/releases/download/v0.2.1-windows/EntreTela-0.2.1-Windows.exe) · [Página da versão](https://github.com/joaobuild/EntreTela/releases/tag/v0.2.1-windows)
 
 ## Como entrar
 
