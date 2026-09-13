@@ -4,14 +4,14 @@ const os = require('node:os');
 const { pathToFileURL } = require('node:url');
 const { Room } = require('./room.cjs');
 const { allowNetwork } = require('./windows-network.cjs');
+const { configurePermissions } = require('./permissions.cjs');
 let win, room, selected = null, starting = false;
 const page = pathToFileURL(path.join(__dirname, 'index.html')).href;
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
   app.on('second-instance', () => { win?.restore(); win?.focus(); });
   app.whenReady().then(() => {
-    session.defaultSession.setPermissionCheckHandler((wc, permission) => wc === win?.webContents && ['media', 'display-capture'].includes(permission));
-    session.defaultSession.setPermissionRequestHandler((wc, permission, callback) => callback(wc === win?.webContents && ['media', 'display-capture'].includes(permission)));
+    configurePermissions(session.defaultSession, wc => wc === win?.webContents);
     session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
       const choice = selected; selected = null;
       try {
