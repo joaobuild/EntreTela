@@ -27,7 +27,7 @@ function updateStage() {
   $('fullscreen').hidden = !sharing;
   $('screen-label').textContent = presenter === me ? 'Sua tela · prévia sem som' : `${members.find(p => p.id === presenter)?.name || 'Amigo'} está compartilhando`;
   $('share').disabled = !inRoom || capturing || !!(presenter && presenter !== me);
-  $('share').textContent = screen ? 'Parar transmissão' : 'Compartilhar tela';
+  $('share').textContent = capturing ? 'Iniciando transmissão…' : screen ? 'Parar transmissão' : 'Compartilhar tela';
 }
 function renderMembers() {
   $('count').textContent = `${members.length}/10`; $('people-count').textContent = members.length;
@@ -213,25 +213,32 @@ async function stopScreen() {
 }
 async function chooseSource(source) {
   if (capturing) return;
-  capturing = true; $('picker').close(); updateStage();
+  capturing = true; $('picker').close(); notice(''); updateStage();
   const epoch = sessionEpoch;
+  const isCurrent = () => epoch === sessionEpoch && inRoom && presenter === me;
   let captured;
   try {
     const withAudio = $('with-audio').checked;
-    if (withAudio && !navigator.mediaDevices.getSupportedConstraints().restrictOwnAudio) throw new Error('Esta versão não permite excluir o áudio da chamada. Compartilhe sem som.');
-    await api.selectSource({ id: source.id, audio: withAudio });
     const preset = profiles[$('quality').value];
-    captured = await navigator.mediaDevices.getDisplayMedia({ video: { width: { ideal: preset.width, max: preset.width }, height: { ideal: preset.height, max: preset.height }, frameRate: { ideal: preset.fps, max: preset.fps } }, audio: withAudio ? { restrictOwnAudio: true, echoCancellation: false, noiseSuppression: false, autoGainControl: false } : false });
-    if (epoch !== sessionEpoch || !inRoom || presenter !== me) { captured.getTracks().forEach(t => t.stop()); return; }
-    if (withAudio && (!captured.getAudioTracks().length || captured.getAudioTracks()[0].getSettings().restrictOwnAudio !== true)) {
-      captured.getTracks().forEach(t => t.stop());
-      throw new Error('O Windows não confirmou a exclusão das vozes. Por segurança, tente compartilhar sem som.');
-    }
+    const result = await EntreTelaCapture.capture({ source, withAudio,
+      video: { width: { ideal: preset.width, max: preset.width }, height: { ideal: preset.height, max: preset.height }, frameRate: { ideal: preset.fps, max: preset.fps } },
+      mediaDevices: navigator.mediaDevices, selectSource: choice => api.selectSource(choice), isCurrent,
+      onRetry: () => notice('Não foi possível iniciar o som. Tentando novamente…') });
+    captured = result.stream;
+    if (!isCurrent()) { captured.getTracks().forEach(t => t.stop()); return; }
     screen = captured; screen.getVideoTracks()[0].contentHint = 'detail';
-    screen.getVideoTracks()[0].onended = () => { stopScreen().catch(error); };
+    screen.getVideoTracks()[0].onended = () => { if (screen === captured) stopScreen().catch(error); };
     $('preview').srcObject = new MediaStream(screen.getVideoTracks());
     await Promise.all([replace(1, screen.getVideoTracks()[0]), replace(2, screen.getAudioTracks()[0] || null)]);
-  } catch (e) { captured?.getTracks().forEach(t => t.stop()); await stopScreen(); error(e); }
+    if (isCurrent() && screen === captured) notice(result.warning);
+  } catch (e) {
+    captured?.getTracks().forEach(t => t.stop());
+    if (isCurrent()) {
+      await stopScreen();
+      if (e.name === 'InvalidStateError') notice('Clique em Compartilhar tela novamente para autorizar uma nova tentativa.');
+      else if (e.code !== 'CAPTURE_CANCELLED') error(e);
+    }
+  }
   finally { capturing = false; updateStage(); }
 }
 async function showPicker() {
