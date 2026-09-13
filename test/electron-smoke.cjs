@@ -68,15 +68,26 @@ async function run() {
   await waitFor(async () => await js(a, `!!microphone`) && await js(b, `!!microphone`), 'synthetic microphones');
   await js(a, `send({type:'share-request'})`);
   await waitFor(() => js(a, `presenter === me`), 'presenter lock');
-  const syntheticScreen = w => js(w, `(async () => {
+  const syntheticScreen = (w, failures = 0) => js(w, `(async () => {
+    clearInterval(window.testPaint); await window.testAudio?.close();
     window.testCanvas = document.createElement('canvas'); testCanvas.width = 640; testCanvas.height = 360;
     window.testPaint = setInterval(() => { const c = testCanvas.getContext('2d'); c.fillStyle = '#347e61'; c.fillRect(0,0,640,360); c.fillStyle = 'white'; c.font='30px sans-serif'; c.fillText('Tela de teste ' + Date.now(),40,180); }, 50);
     window.testAudio = new AudioContext(); const osc = testAudio.createOscillator(); const dest = testAudio.createMediaStreamDestination(); osc.connect(dest); osc.start(); await testAudio.resume();
-    screen = new MediaStream([...testCanvas.captureStream(15).getVideoTracks(), ...dest.stream.getAudioTracks()]);
-    $('preview').srcObject = new MediaStream(screen.getVideoTracks());
-    await replace(1, screen.getVideoTracks()[0]); await replace(2, screen.getAudioTracks()[0]); updateStage();
+    const original = navigator.mediaDevices.getDisplayMedia;
+    window.testCaptureAttempts = 0;
+    navigator.mediaDevices.getDisplayMedia = async options => {
+      window.testCaptureAttempts++;
+      if (options.audio && window.testCaptureAttempts <= ${failures}) throw new DOMException('Could not start audio source', 'NotReadableError');
+      const audio = options.audio ? dest.stream.getAudioTracks() : [];
+      for (const track of audio) { const settings = track.getSettings.bind(track); track.getSettings = () => ({ ...settings(), restrictOwnAudio: options.audio.restrictOwnAudio }); }
+      return new MediaStream([...testCanvas.captureStream(15).getVideoTracks(), ...audio]);
+    };
+    try { await chooseSource({id:'screen:test',name:'Tela de teste'}); }
+    finally { navigator.mediaDevices.getDisplayMedia = original; }
   })()`);
-  await syntheticScreen(a);
+  await syntheticScreen(a, 1);
+  assert.equal(await js(a, `testCaptureAttempts`), 2, 'first audio startup failure recovers automatically');
+  assert.equal(await js(a, `$('notice').hidden && screen.getAudioTracks().length === 1 && !$('share').disabled`), true, 'successful recovery clears notice and re-enables sharing control');
   await waitFor(() => js(b, `(async () => {const reports = [...(await [...peers.values()][0].pc.getStats()).values()]; return reports.some(r=>r.type==='inbound-rtp' && r.kind==='video' && r.framesDecoded>2) && reports.filter(r=>r.type==='inbound-rtp' && r.kind==='audio' && r.bytesReceived>0).length===2;})()`), 'separate voice, screen sound and decoded video');
   await waitFor(() => js(a, `(async () => { const reports = [...(await [...peers.values()][0].pc.getStats()).values()]; return reports.some(r => r.type === 'inbound-rtp' && r.kind === 'audio' && r.bytesReceived > 0); })()`), 'voice in the opposite direction');
   for (const w of [a, b]) {
@@ -110,8 +121,16 @@ async function run() {
   await waitFor(() => js(a, `document.fullscreenElement === $('stage')`), 'reverse viewer enters fullscreen');
   await js(b, `stopScreen()`);
   await waitFor(() => js(a, `presenter === null && !document.fullscreenElement`), 'ending presentation also exits fullscreen');
+  await js(a, `send({type:'share-request'})`);
+  await waitFor(() => js(a, `presenter === me`), 'presentation available after restarting capture');
+  await syntheticScreen(a, 3);
+  assert.equal(await js(a, `testCaptureAttempts`), 4, 'persistent audio startup failure retries then captures video only');
+  assert.equal(await js(a, `screen.getAudioTracks().length === 0 && [...peers.values()][0].channels.sound.sender.track === null && $('notice').textContent.includes('Tela transmitida sem som') && !$('share').disabled`), true, 'video-only fallback is explicit and cannot forward unisolated sound');
+  await waitFor(() => greenFrame(b), 'viewer still sees the screen after persistent audio startup failure');
+  assert.equal(await js(a, `!!microphone && inRoom`), true, 'audio capture failure preserves microphone and room');
+  await js(a, `stopScreen()`);
   const support = await js(a, `navigator.mediaDevices.getSupportedConstraints().restrictOwnAudio`);
-  console.log(JSON.stringify({ ok: true, reverseOffer, electron: process.versions.electron, restrictOwnAudioSupported: support, tests: ['exactly three negotiated roles','receive with own microphone off','bidirectional voice playback','visible screen pixels in both directions','separate screen audio playback','viewer fullscreen','local preview has no audio','microphone mute','deafen','stop sharing'] }));
+  console.log(JSON.stringify({ ok: true, reverseOffer, electron: process.versions.electron, restrictOwnAudioSupported: support, tests: ['audio startup recovery','explicit video-only fallback','exactly three negotiated roles','receive with own microphone off','bidirectional voice playback','visible screen pixels in both directions','separate screen audio playback','viewer fullscreen','local preview has no audio','microphone mute','deafen','stop sharing'] }));
   fs.writeFileSync(path.join(out, 'passed.json'), JSON.stringify({ok:true,electron:process.versions.electron,restrictOwnAudioSupported:support}));
 }
 const timeout = setTimeout(() => { console.error('Smoke test timed out'); app.exit(1); }, 60000);
